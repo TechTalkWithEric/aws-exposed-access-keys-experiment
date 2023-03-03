@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: "2010-09-09"
+#Transform: AWS::Serverless-2016-10-31
+Description: >
+  Lab for testing Exposed AWS Keys CloudFormation Template. This template comes as-is w/o
+  any gurantee of your keys safety, please use it as your own risk.
+  DO NOT USE THIS IF YOU'RE NOT FAMILAR WITH AWS SECURITY
+
+
+
+Parameters:
+  UserName:
+    Type: String
+    Description: The user name of your user with bad security practices
+
+  
+  CreateS3BucketOption:
+    Type: String
+    Description: Determines if we create a new S3 bucket that we can test a users permissions againts
+    Default: yes
+    AllowedValues:
+      - yes
+      - no
+
+  IsUserASecurityRisk:
+    Type: String
+    Description: > 
+      When set to yes/true the user will be explicity added the DenyAll managed policy.
+      This policy will take precedence over any other access.  Make sure add the DenyAll before exposing the keys
+    Default: yes
+    AllowedValues:
+      - yes
+      - no
+
+Conditions:
+  ApplySecurityRiskPolicy: !Equals [!Ref IsUserASecurityRisk, yes]
+  CreateS3Bucket: !Equals [!Ref CreateS3BucketOption, yes]
+
+Resources:
+
+  DevOpsInTrainingS3Bucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateS3Bucket
+    Properties:
+      BucketName: !Sub "${AWS::AccountId}-${AWS::StackName}-junior-devops"
+
+  DevOpsInTrainingGroup:
+    Type: AWS::IAM::Group
+    Properties: 
+      GroupName: DevOpsInTrainingGroup
+
+  DevOpsInTrainingBucketPolicy:
+    Type: AWS::IAM::Policy
+    Condition: CreateS3Bucket
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-junior-devops-bucket-access-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # allow them to list all the buckets in s3
+          - Effect: Allow
+            Action: 's3:ListAllMyBuckets'          
+            Resource: 'arn:aws:s3:::*'
+          # allow access to this bucket
+          - Effect: Allow
+            Action:
+              - "s3:ListBucket"
+              - "s3:GetBucketLocation"
+            Resource: !Sub 'arn:aws:s3:::${DevOpsInTrainingS3Bucket}'
+          # allow to add/update/delete on objects in this bucket
+          - Effect: Allow
+            Action: 
+              - "s3:PutObject"
+              - "s3:PutObjectAcl"
+              - "s3:GetObject"
+              - "s3:GetObjectAcl"
+              - "s3:DeleteObject"
+            Resource: !Sub 'arn:aws:s3:::${DevOpsInTrainingS3Bucket}/*'
+      Groups:  
+        - !Ref DevOpsInTrainingGroup
+
+  ## Create an Group that is used to manage people who've 
+  ## become flagged as a security risk
+  SecurityRiskGroup:
+    Type: AWS::IAM::Group
+    Properties: 
+      GroupName: SecurityRiskGroup
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/AWSDenyAll
+      Path: /
+
+  
+      
+  
+  DevOpsTraineeUser:
+    Type: AWS::IAM::User
+    Properties: 
+      Groups: 
+        - !Ref DevOpsInTrainingGroup
+        # apply it if they are deemed a security risk
+        - !If [ApplySecurityRiskPolicy, !Ref SecurityRiskGroup, !Ref "AWS::NoValue" ]               
+      Path: /      
+      Tags: 
+        - Key: purpose
+          Value: a user who is a DevOps user in-training
+
+      UserName: !Ref UserName
+
+  # creating the access keys here for easy of use.
+  # I normally wouldn't do this here for security concerns but it's usefull for this experiment
+  AccessKeys:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref DevOpsTraineeUser
+
+Outputs:
+  AccessKey:
+    Value: !Ref AccessKeys
+    Description: "AWSAccessKeyId of new user - this is a bad practice (don't do this)!!!"
+  SecretKey:
+    Value: !GetAtt AccessKeys.SecretAccessKey
+    Description: "AWSSecretAccessKey of new user - this is a bad practice (don't do this)!!"
+ 
+  IsUserASecurityRisk:
+    Value: !Ref IsUserASecurityRisk
+    Description: The value of the entry field
+  
+  DevOpsInTrainingS3Bucket:
+    Value: !Ref DevOpsInTrainingS3Bucket
+    Description: The bucket name
+    Condition: CreateS3Bucket
