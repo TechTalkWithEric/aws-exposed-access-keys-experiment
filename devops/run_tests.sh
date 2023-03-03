@@ -1,7 +1,7 @@
 
 # I AM EXPOSING THESE KEYS ON PURPOSE TO TEST THE
-export AWS_ACCESS_KEY_ID="AKIA5YWYFF55XJB6ITKE"
-export AWS_SECRET_ACCESS_KEY="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"
+export AWS_ACCESS_KEY_ID="AKIA5YWYFF556M4TFVVL"
+export AWS_SECRET_ACCESS_KEY="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"
 export bucket_name="946419871611-exposed-keys-junior-devops"
 export bucket_sync_to="s3://${bucket_name}/my-devops-stuff/"
 export AWS_REGION="us-east-1"
